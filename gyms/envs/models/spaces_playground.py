@@ -23,7 +23,7 @@ for ticker in tickers:
 action_space = spaces.Box(low=np.array(low_actions), high=np.array(high_actions), shape=(len(tickers), 2), dtype=np.int32)
 #other_action_space = spaces.Box(low=np.array([-1, 0, 0]), high=np.array([1, len(tickers), 100]), shape=(3,))
 # Prices contains the OHCL values for the last five prices
-observation_space = spaces.Box(low=0, high=999, shape=(6, 6))
+observation_space = spaces.Box(low=0, high=999, shape=(5, 4))
 print(observation_space.sample())
 print(action_space.sample())
 custom_space = spaces.Dict()
