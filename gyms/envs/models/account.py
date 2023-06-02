@@ -1,8 +1,10 @@
-import position
+from model import Model
+from position import Position
 
-class Account(object):
-    def __init__(self, id: int, balance: float, positions: list[position.Position]):
-        self.id = id
-        self.balance = balance
-        self.available_funds
-        self.positions = positions
+BaseAccount = type("BaseAccount", (Model,), {
+    'positions': Position
+})
+
+class Account(BaseAccount):
+    def __init__(self, json: dict):
+        super().__init__(json)
