@@ -1,4 +1,4 @@
-from model import Model
+from gyms.envs.models.model import Model
 BasePosition = type("BasePosition", (Model,), {})
 
 class Position(BasePosition):

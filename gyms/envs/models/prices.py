@@ -1,4 +1,4 @@
-from models.model import Model
+from gyms.envs.models.model import Model
 
 BasePrice = type("BasePrice", (Model,), {
     'open': None,
