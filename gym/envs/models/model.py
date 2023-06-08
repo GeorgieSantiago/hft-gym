@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+
 class Model(object):
     json: dict
     def __init__(self, json: dict) -> None:
@@ -10,5 +13,8 @@ class Model(object):
             fields = self.json.keys()
         for field in fields:
             if field in self.json.keys():
-                attrs.append(getattr(self, field))
+                val = getattr(self, field)
+                if type(val) == float:
+                    val = round(val, 2)
+                attrs.append(val)
         return attrs

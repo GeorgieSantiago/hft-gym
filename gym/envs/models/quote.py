@@ -1,4 +1,4 @@
-from gyms.envs.models.model import Model
+from gym.envs.models.model import Model
 
 BaseQuote = type('BaseQuote', (Model,), {
         'symbol': None,

@@ -1,4 +1,4 @@
-from gyms.envs.models.model import Model
+from gym.envs.models.model import Model
 
 BaseBalance = type("BaseBalance", (Model,), {
         'accountId': None,
@@ -49,3 +49,5 @@ BaseBalance = type("BaseBalance", (Model,), {
 class Balance(BaseBalance):
     def __init__(self, json: dict) -> None:
         super().__init__(json)
+    def change(self, amount: int):
+        self.stockBuyingPower += amount

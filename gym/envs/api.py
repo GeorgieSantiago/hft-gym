@@ -1,6 +1,6 @@
 import requests
-from gyms.envs.models.prices import Price
-from gyms.envs.models.quote import Quote
+from gym.envs.models.prices import Price
+from gym.envs.models.quote import Quote
 
 BASE_URL = "http://127.0.0.1:8000/api"
 

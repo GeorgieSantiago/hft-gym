@@ -1,5 +1,5 @@
-from gyms.envs.models.model import Model
-from gyms.envs.models.position import Position
+from gym.envs.models.model import Model
+from gym.envs.models.position import Position
 
 BaseAccount = type("BaseAccount", (Model,), {
     'positions': Position
