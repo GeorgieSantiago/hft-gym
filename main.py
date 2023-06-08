@@ -1,12 +1,18 @@
-from gyms.envs.engine import Engine
+import gymnasium as gym
 import numpy as np
 from utils import plotLearning
 import logging
 
 logging.basicConfig(filename='debug.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 logging.info("Logging online")
+gym.envs.register(
+     id='engine-v0',
+     entry_point='gym.envs.engine:Engine',
+     max_episode_steps=250,
+)
+
 def main():
-    env = Engine()
+    env = gym.make('engine-v0')
     net = None
     score_history = []
     eps_history = []
@@ -20,12 +26,10 @@ def main():
         logging.debug(f"Starting Epoch {i}")
         while not done:
             #TODO action = net.choose_action(obs)
-            action = np.array([
-                [1, 100],
-                [-1, 35],
-            ])
+            action = env.action_space.sample()
             logging.debug(action)
-            _obs, reward, terminated, truncated, info = env.step(action)
+            _obs, reward, terminated, truncated, _ = env.step(action)
+            print(_obs)
             score += reward
             done = terminated or truncated
             #TODO agent store transition
