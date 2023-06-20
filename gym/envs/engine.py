@@ -23,7 +23,7 @@ class PurchaseAction(Enum):
 class Engine(Env):
     mock: bool = True
     current_step: int = 0
-    last_action = []
+    last_action: list = list()
     balance: Balance
     prev_balance: Balance
     positions: Positions

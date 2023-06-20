@@ -18,6 +18,4 @@ def get_quote(symbol: str) -> Quote:
 def get_quotes(symbols: list[str]) -> list[Quote]:
     quotes = list()
     response = requests.Response = requests.get(f"{BASE_URL}/quotes/search?symbols={','.join(symbols)}")
-    for quote in response.json():
-        quotes.append(Quote(quote))
-    return quotes
+    return [Quote(quote) for quote in response.json()]
