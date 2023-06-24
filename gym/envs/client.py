@@ -8,8 +8,10 @@ from datetime import datetime
 
 trading_client = TradingClient(env.KEY, env.SECRET, paper=True)
 stock_client = StockHistoricalDataClient(env.KEY, env.SECRET)
-stock_historical_client = StockHistoricalDataClient(env.KEY, env.SECRET)
-crypto_historical_client = CryptoHistoricalDataClient(env.KEY, env.SECRET)
+crypto_client = CryptoHistoricalDataClient(env.KEY, env.SECRET, url_override="")
+
+def get_account():
+    return trading_client.get_account()
 
 class Instrument(object):
     def __init__(self, symbol: str) -> None:
@@ -17,7 +19,7 @@ class Instrument(object):
     def get(self):
         pass
     def collection(self, start: datetime, end: datetime):
-        request = CryptoBarsRequest(symbol_or_symbols=self.symbol)
+        pass
 
 class Symbol(Instrument):
     def get(self):
@@ -30,12 +32,13 @@ class Symbol(Instrument):
             start=start,
             end=end
         )
-        return stock_historical_client.get_stock_bars(request).df
+        stock_client._use_raw_data = True
+        return stock_client.get_stock_bars(request)
 
 class Crypto(Instrument):
     def get(self):
         request = CryptoLatestQuoteRequest(symbol_or_symbols=self.symbol)
-        return crypto_historical_client.get_crypto_latest_bar(request)
+        return crypto_client.get_crypto_latest_bar(request)
     def collection(self, start: datetime, end: datetime):
         request = CryptoBarsRequest(
             symbol_or_symbols=self.symbol,
@@ -43,13 +46,4 @@ class Crypto(Instrument):
             start=start,
             end=end
         )
-        return crypto_historical_client.get_crypto_bars(request).df
-
-
-def d_test():
-    tsla = Symbol("TSLA")
-    eth = Crypto("ETH/USD")
-    print("Quote:")
-    print(tsla.get())
-    print("Bars \n")
-    print(tsla.collection(datetime(2022, 6, 17), datetime(2022, 6, 19)))
+        return crypto_client.get_crypto_bars(request)

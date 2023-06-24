@@ -1,9 +1,7 @@
-from enum import Enum
 from gymnasium import Env, spaces
 import numpy as np
-from gym.envs.models.balance import Balance
-from gym.envs.models.positions import Positions
-from gym.envs.client import trading_client
+from gym.envs.client import get_account
+from utils import plot_bars
 
 class Engine(Env):
     metadata = {'render_modes': ['human']}
@@ -24,7 +22,7 @@ class Engine(Env):
         print(f"Current Step: {self.current_step}")
     def reset(self, seed = None, options: dict = None) -> tuple((any, dict)):
         #TODO redo reset method
-        self.account = trading_client.get_account()
+        self.account = get_account()
         print("ENV RESET>>>>>>>>>>")
         return (self._get_obs(), {})
     def _place_orders(self, buy_price, sell_price) -> None:

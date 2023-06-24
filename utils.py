@@ -1,6 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import gymnasium as gym
+from datetime import datetime
+import mplfinance as mpf
+import pandas as pd
+from PIL import Image
+import os
+import io
+
+from gym.envs.client import Symbol
 
 def plotLearning(x, scores, epsilons, filename, lines=None):
     fig=plt.figure()
@@ -17,7 +25,6 @@ def plotLearning(x, scores, epsilons, filename, lines=None):
     running_avg = np.empty(N)
     for t in range(N):
 	    running_avg[t] = np.mean(scores[max(0, t-20):(t+1)])
-
     ax2.scatter(x, running_avg, color="C1")
     #ax2.xaxis.tick_top()
     ax2.axes.get_xaxis().set_visible(False)
@@ -109,6 +116,15 @@ class BufferWrapper(gym.ObservationWrapper):
         self.buffer[-1] = observation
         return self.buffer
 
+class HOLC(object):
+    def __init__(self, _high: float, _open: float, _low: float, _close: float, _volume: float, _period: datetime):
+        self.high = _high
+        self.open = _open
+        self.low = _low
+        self.close = _close
+        self.period = _period
+        self.volume = _volume
+
 def make_env(env_name):
     env = gym.make(env_name)
     env = SkipEnv(env)
@@ -116,3 +132,37 @@ def make_env(env_name):
     env = MoveImgChannel(env)
     env = BufferWrapper(env, 4)
     return ScaleFrame(env)
+
+def plot_bars(data, start_dt: datetime, end_dt: datetime, as_np_array=False, save=False) -> Image:
+    symbols = list(data.keys())
+    for symbol in symbols:
+        objs = [{
+            'high': d['h'],
+            'open': d['o'],
+            'low': d['l'],
+            'close': d['c'],
+            'volume': d['v'],
+        } for d in data[symbol] if d != None]
+        df = pd.DataFrame(objs, [pd.to_datetime(d['t']) for d in data[symbol] if d != None])
+        fig, _ = mpf.plot(df, volume=True, returnfig=True)
+        img_buf = io.BytesIO()
+        fig.savefig(img_buf, format='png')
+        #mpf.plot(df, type='ohlc', filename=img_buf)
+        
+        im = Image.open(img_buf)
+        im.show(title="My Image")
+        img_buf.close()
+        if save:
+            if "plots" not in os.listdir():
+                os.mkdir("plots")
+            filename = f"plots/{symbol}-{start_dt.timestamp()}-{end_dt.timestamp()}-figures.png"
+            fig.savefig(filename, format="png")
+        if as_np_array:
+            return np.array(im)
+        return im
+
+# Usage
+# instrument = Symbol('TSLA')
+# start_dt = datetime(2023, 5, 22)
+# end_dt = datetime(2023, 5, 23)
+# im = plot_bars(instrument.collection(start_dt, end_dt), start_dt, end_dt, as_np_array=True, save=False)

@@ -4,7 +4,7 @@ from utils import plotLearning
 import logging
 import sys
 import argparse
-from gym.envs.client import d_test
+from gym.envs.client import d_test, s_test
 
 logging.basicConfig(filename='debug.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 logging.info("Logging online")
@@ -20,6 +20,8 @@ def println(data):
     sys.stdout.flush()
 
 def main(options: dict):
+    # s_test()
+    # exit(1)
     d_test()
     exit(1)
     env = gym.make('engine-v0')
