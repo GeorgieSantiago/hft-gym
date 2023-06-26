@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import gymnasium as gym
-from datetime import datetime
+from datetime import datetime, timedelta
 import mplfinance as mpf
 import pandas as pd
 from PIL import Image
@@ -133,36 +133,42 @@ def make_env(env_name):
     env = BufferWrapper(env, 4)
     return ScaleFrame(env)
 
-def plot_bars(data, start_dt: datetime, end_dt: datetime, as_np_array=False, save=False) -> Image:
-    symbols = list(data.keys())
-    for symbol in symbols:
-        objs = [{
-            'high': d['h'],
-            'open': d['o'],
-            'low': d['l'],
-            'close': d['c'],
-            'volume': d['v'],
-        } for d in data[symbol] if d != None]
-        df = pd.DataFrame(objs, [pd.to_datetime(d['t']) for d in data[symbol] if d != None])
-        fig, _ = mpf.plot(df, volume=True, returnfig=True)
-        img_buf = io.BytesIO()
-        fig.savefig(img_buf, format='png')
-        #mpf.plot(df, type='ohlc', filename=img_buf)
-        
-        im = Image.open(img_buf)
-        im.show(title="My Image")
-        img_buf.close()
-        if save:
-            if "plots" not in os.listdir():
-                os.mkdir("plots")
-            filename = f"plots/{symbol}-{start_dt.timestamp()}-{end_dt.timestamp()}-figures.png"
-            fig.savefig(filename, format="png")
-        if as_np_array:
-            return np.array(im)
-        return im
+def plot_bars(data, start_dt: datetime, end_dt: datetime, as_np_array=False, save=False, show=False) -> Image:
+    objs = [{
+        'high': d['h'],
+        'open': d['o'],
+        'low': d['l'],
+        'close': d['c'],
+        'volume': d['v'],
+    } for d in data if d != None]
+    df = pd.DataFrame(objs, [pd.to_datetime(d['t']) for d in data if d != None])
+    fig, _ = mpf.plot(df, type='candle', volume=True, returnfig=True)
+    img_buf = io.BytesIO()
+    fig.savefig(img_buf, format='png')        
+    im = Image.open(img_buf)
+    if show:
+        im.show()
+    if save:
+        if "plots" not in os.listdir():
+            os.mkdir("plots")
+        filename = f"plots/{start_dt.timestamp()}-{end_dt.timestamp()}-figures.png"
+        fig.savefig(filename, format="png")
+    if as_np_array:
+        im = np.array(im)
+    img_buf.close()
+    return im
 
 # Usage
 # instrument = Symbol('TSLA')
 # start_dt = datetime(2023, 5, 22)
 # end_dt = datetime(2023, 5, 23)
-# im = plot_bars(instrument.collection(start_dt, end_dt), start_dt, end_dt, as_np_array=True, save=False)
+# im = plot_bars(instrument.collection(start_dt, end_dt), start_dt, end_dt, as_np_array=True, save=True, show=True)
+
+
+def get_obs_shape():
+    today = datetime.today()
+    monday = today - timedelta(days=today.weekday())
+    wednesday = monday + timedelta(days=2)
+    symbol = Symbol('TSLA')
+    data = plot_bars(symbol.collection(monday, wednesday)['TSLA'], monday, wednesday, as_np_array=True)
+    print(data.shape)

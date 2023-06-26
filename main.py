@@ -1,16 +1,24 @@
 import gymnasium as gym
 import numpy as np
-from utils import plotLearning
+from utils import plotLearning, get_obs_shape
 import logging
 import sys
 import argparse
-from gym.envs.client import d_test, s_test
+from gym.envs.client import Symbol
+from datetime import datetime
 
 logging.basicConfig(filename='debug.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 logging.info("Logging online")
+
+# gym.envs.register(
+#      id='engine-v0',
+#      entry_point='gym.envs.engine:Engine',
+#      max_episode_steps=250,
+# )
+
 gym.envs.register(
-     id='engine-v0',
-     entry_point='gym.envs.engine:Engine',
+     id='engine-v1',
+     entry_point='gym.envs.alpaca_env:Alpaca',
      max_episode_steps=250,
 )
 
@@ -19,12 +27,9 @@ def println(data):
     print("\n")
     sys.stdout.flush()
 
-def main(options: dict):
-    # s_test()
-    # exit(1)
-    d_test()
-    exit(1)
-    env = gym.make('engine-v0')
+def run():
+    env = gym.make('engine-v1')
+    env.setup("TSLA", 12, start_time=datetime(2022, 6, 1), end_time=datetime(2022, 6, 21), debug=True)
     net = None
     score_history = []
     eps_history = []
@@ -37,19 +42,13 @@ def main(options: dict):
         obs = env.reset()
         logging.debug(f"Starting Epoch {i}")
         while not done:
-            #TODO action = net.choose_action(obs)
-            if options.user == 'ai':
-                action = env.action_space.sample()
-                logging.debug(action)
-                _obs, reward, terminated, truncated, _ = env.step(action)
-                score += reward
-                done = terminated or truncated
-                #TODO agent store transition
-                #TODO net.store_transition(obs, action, reward, _obs, terminated, truncated)
-                #TODO net.learn()
-                obs = _obs
-            else:
-                pass
+            action = env.action_space.sample()
+            logging.debug(action)
+            _obs, reward, terminated, truncated, _ = env.step(action)
+            exit(1)
+            score += reward
+            done = terminated or truncated
+            obs = _obs
         score_history.append(score + i)
         eps_history.append(n_epochs - i)
         avg_score = np.mean(score_history[-100:])
@@ -57,6 +56,19 @@ def main(options: dict):
     x = [i + 1 for i in range(n_epochs)]
     filename = 'temp_output.png' #TODO switch this to console param
     plotLearning(x, score_history, eps_history, filename)
+
+def main(options: dict):
+    '''
+    Utilities
+    '''
+    if options.obs_shape:
+        return get_obs_shape()
+    
+    '''
+    Engine entrypoint
+    '''
+    run()
+
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser(
@@ -68,4 +80,6 @@ if __name__ == '__main__':
         'ai',
         'algo'
     ], default='ai')
+
+    args.add_argument('--obs_shape', default=False, type=bool)
     main(args.parse_args())
