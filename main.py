@@ -33,7 +33,7 @@ def run():
     net = None
     score_history = []
     eps_history = []
-    n_epochs = 500
+    n_epochs = 2
     logging.debug("Training start!")
     println('Training started!')
     for i in range(n_epochs):
@@ -45,7 +45,6 @@ def run():
             action = env.action_space.sample()
             logging.debug(action)
             _obs, reward, terminated, truncated, _ = env.step(action)
-            exit(1)
             score += reward
             done = terminated or truncated
             obs = _obs
