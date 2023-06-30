@@ -4,7 +4,7 @@ from utils import plotLearning, get_obs_shape
 import logging
 import sys
 import argparse
-from gym.envs.client import Symbol
+from gym.envs.client import Symbol, get_account, get_open_positions, get_orders
 from datetime import datetime
 
 logging.basicConfig(filename='debug.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
@@ -29,7 +29,7 @@ def println(data):
 
 def run():
     env = gym.make('engine-v1')
-    env.setup("TSLA", 12, start_time=datetime(2022, 6, 1), end_time=datetime(2022, 6, 21), debug=True)
+    env.setup("TSLA", 60, start_time=datetime(2022, 6, 1), end_time=datetime(2022, 6, 21), debug=True, live=False)
     net = None
     score_history = []
     eps_history = []
