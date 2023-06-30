@@ -154,8 +154,9 @@ def plot_bars(data, start_dt: datetime, end_dt: datetime, as_np_array=False, sav
         filename = f"plots/{start_dt.timestamp()}-{end_dt.timestamp()}-figures.png"
         fig.savefig(filename, format="png")
     if as_np_array:
-        im = np.array(im)
+        return np.array(im, dtype=np.float32)
     img_buf.close()
+
     return im
 
 # Usage
