@@ -39,12 +39,12 @@ def run():
     for i in range(n_epochs):
         score = 0
         done = False
-        obs = env.reset()
+        obs, _ = env.reset()
         logging.debug(f"Starting Epoch {i}")
         while not done:
             action = env.action_space.sample()
             logging.debug(action)
-            _obs, reward, terminated, truncated, _ = env.step(action)
+            _obs, reward, terminated, truncated, info = env.step(action)
             score += reward
             done = terminated or truncated
             obs = _obs

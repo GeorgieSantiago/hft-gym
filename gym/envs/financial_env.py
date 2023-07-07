@@ -1,7 +1,7 @@
 from typing import Any, SupportsFloat
 from uuid import uuid4, UUID
 from gymnasium import Env
-from gym.envs.client import Symbol, get_account, get_open_positions
+from gym.envs.client import Symbol, Instrument, get_account, get_open_positions
 from datetime import datetime, timedelta
 from gym.envs.mock_order import MockOrder
 from gym.envs.report_card import ReportCard
@@ -50,41 +50,15 @@ Production - Against real account
 
 class FinancialEnv(Env):
     account: TradeAccount
+    instrument: Instrument
     positions: list[Position] = list()
     orders: list[Order | MockOrder] = list()
     data: dict = dict()
     consecutive_closed_orders: int = 0
-
-    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
-        # super().reset(seed, options)
-        self.account = get_account()
-        self.starting_value = self.account.portfolio_value
-        if self.original_start_dt != None:
-            self._reset_simulated_timesteps(self.original_start_dt, self.end_dt, self.interval)
-        return (self._get_obs(), {})
-
-    '''
-    Virtual methods
-    '''
-
-    def step(self, action: Any) -> tuple[Any, SupportsFloat, bool, bool, dict[str, Any]]:
-        if self.live:
-            self.account = get_account()
-        self._step_times()
-        self._close_orders()
-        pass
-
-    def render(self):
-        pass
-
-    def close(self):
-        current_account = get_account()
-        print(f"Starting balance: {self.starting_value} Ending balance: {current_account.portfolio_value}")
-        pass
-
-    '''
-    Private Methods
-    '''
+    live: bool = False
+    debug: bool = False
+    symbol: str
+    interval: int
 
     def _get_obs(self):
         collection = self.instrument.collection(self.start_dt, self.current_dt)[self.symbol] \
@@ -104,17 +78,6 @@ class FinancialEnv(Env):
             self.current_dt += delta
             self.start_dt = self.current_dt - timedelta(minutes=self.interval)
 
-    '''
-    Calculate reward of actions
-    @TODO Calculate the reward
-    Rewards are calculated on a delayed gratification
-    By mapping through the orders that are complete but
-    not calculated we can derive values from
-    1. time * -1 for buy fill time
-    2. time * -1 for sell fill time
-    3. profit for completed sell orders
-    4. loss for stop orders
-    '''
     def _get_reward(self, action):
         buy_price, sell_change, stop_change = action
         # @NOTE the actual order timestamp is slightly diff from this one
@@ -161,26 +124,28 @@ class FinancialEnv(Env):
             report_card.change(-15000)
         return report_card()
 
-    '''
-    @TODO Work on correcting the order information
-    '''
-
     def _order(self, action) -> bool:
         self.debug_message(action)
         if self._is_action_valid(action):
             buy_price, sell_change, stop_change = action
             if self.live:
+                '''
+                @TODO Work on correcting the order information
+                '''
                 self.instrument.order(buy_price, buy_price + sell_change, buy_price - stop_change)
+                return True
             else:
                 cost = buy_price * 2
                 self._update_account(cost * -1)
                 order = self._create_order(buy_price, buy_price + sell_change, buy_price - stop_change)
                 self.orders.append(order)
+                return True
+        return False
 
-    def _get_terminal(self) -> tuple((bool, bool)):
+    def _get_terminal(self) -> tuple[bool, bool]:
         if self.debug:
             print(f"Account cash: {self.account.cash}")
-        return tuple((self.account.cash == 0, self.current_dt > self.end_dt and self.live == False))
+        return self.account.cash == 0, self.current_dt > self.end_dt is not None and self.live == False
 
     def _is_action_valid(self, action) -> bool:
         if action[0] > float(self.account.buying_power):
