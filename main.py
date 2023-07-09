@@ -12,6 +12,7 @@ gym.envs.register(
     max_episode_steps=250,
 )
 
+
 def println(data):
     print(data)
     print("\n")
@@ -40,11 +41,13 @@ def run(human_player: bool = False):
             else:
                 print(obs)
                 should_continue = input("Continue? [y/n]")
-                open_price = input("Open price")
-                spread_value = input("Spread")
-                loss_value = input("Loss")
-                _obs, reward, terminated, truncated, info = env.step((open_price, open_price + spread_value, open_price - loss_value))
+                open_price = float(input("Open price: "))
+                spread_value = float(input("Spread: "))
+                loss_value = float(input("Loss: "))
+                _obs, reward, terminated, truncated, info = env.step(
+                    (open_price, spread_value, loss_value))
                 done = terminated or truncated or should_continue is not 'y'
+                println(f"reward: {reward}")
                 obs = _obs
         score_history.append(score)
         eps_history.append(n_epochs)
