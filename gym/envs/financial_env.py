@@ -3,69 +3,49 @@ from uuid import uuid4, UUID
 from gymnasium import Env
 from gym.envs.client import Symbol, Instrument, get_account, get_open_positions
 from datetime import datetime, timedelta
-from gym.envs.mock_order import MockOrder
+from gym.envs.mock_order import MockOrder, create_order
 from gym.envs.report_card import ReportCard
 from utils import plot_bars
 from alpaca.trading.models import TradeAccount, Position, Order
 from alpaca.trading.enums import OrderStatus
-
-'''
-@TODO main updates
-
-Training:
-A start and end time are selected as well as an interval used
-to calculate the env obs data. On reset the current date is
-calculated by the start date + interval. At each step the delta time
-will be added to the current datetime. The start time will then be
-calculated as the end time - interval. This will simulate actual
-time movement as seen in the live env.
-
-Calculating the reward:
-On reset the env will gather the entire data via the start and end
-range. This will be used to "look ahead" in the data to calculate the
-value of an order.
-
-Live:
-Instead only the interval will be selected. The end time will be
-calculated as now and the start time will be end_time - interval
-(done artificially in the training step via the delta time)
-
-This window will be used to request the bars of a specified
-instrument and that response will be converted in to image and then 
-an np.array for use by the agent
+from gym.envs.models.tick import Tick
 
 
-@TODO
-
-Training - Simulate the orders and transactions
-- Simulate stopped orders
-- Simulate sold orders
-
-Eval - Against paper trading
-
-Production - Against real account
-
-'''
+def collection(data: list):
+    return [Tick(d).to_array() for d in data]
 
 
 class FinancialEnv(Env):
-    account: TradeAccount
-    instrument: Instrument
-    positions: list[Position] = list()
-    orders: list[Order | MockOrder] = list()
-    data: dict = dict()
     consecutive_closed_orders: int = 0
     live: bool = False
     debug: bool = False
+    positions: list[Position]
+    orders: list[Order | MockOrder]
+    account: TradeAccount
+    data: dict
     symbol: str
     interval: int
+    starting_value: float
+    instrument: Instrument
+    current_dt: datetime
+    start_dt: datetime
+    original_start_dt: datetime
+    tzinfo: datetime.tzinfo
+
+    def step(self, action):
+        if self.live:
+            self.account = get_account()
+        self._step_times()
+        self._order_step()
+        pass
 
     def _get_obs(self):
-        collection = self.instrument.collection(self.start_dt, self.current_dt)[self.symbol] \
+        data = self.instrument.collection(self.start_dt, self.current_dt)[self.symbol] \
             if self.live else self._get_timestep_collection(self.start_dt, self.current_dt)
-        self.current_collection = collection
-        obs = plot_bars(collection, self.start_dt, self.current_dt, as_np_array=True)
-        return obs
+        self.current_collection = data
+        return collection(data)
+        # obs = plot_bars(collection, self.start_dt, self.current_dt, as_np_array=True)
+        # return obs
 
     def _step_times(self):
         if self.live:
@@ -81,7 +61,7 @@ class FinancialEnv(Env):
     def _get_reward(self, action):
         buy_price, sell_change, stop_change = action
         # @NOTE the actual order timestamp is slightly diff from this one
-        order = self._create_order(buy_price, buy_price + sell_change, buy_price - stop_change)
+        order = create_order(buy_price, buy_price + sell_change, buy_price - stop_change, self.tzinfo)
         future_values = self._get_timestep_collection(self.current_dt, self.end_dt)
         report_card = ReportCard()
         is_open: bool = False
@@ -96,7 +76,6 @@ class FinancialEnv(Env):
                     self.consecutive_closed_orders += 1
                     diff: timedelta = ts - order.created_at
                     profit = order.close_price - order.open_price
-                    self.debug_message(f"Order filled for profit {profit} from {open_price} to {close_price}")
                     report_card \
                         .status(OrderStatus.FILLED) \
                         .fill_time(diff.total_seconds() + (abs(close_time.total_seconds()))) \
@@ -107,7 +86,6 @@ class FinancialEnv(Env):
                     self.consecutive_closed_orders = 0
                     diff: timedelta = ts - order.created_at
                     loss = order.stop_price - order.open_price
-                    self.debug_message(f"Order stopped for loss {loss} at price {open_price} to {close_price}")
                     report_card \
                         .status(OrderStatus.STOPPED) \
                         .profit(loss) \
@@ -121,103 +99,83 @@ class FinancialEnv(Env):
                     close_time = diff
                     report_card.fill_time(int(diff.total_seconds()))
         if not is_open:
-            report_card.change(-15000)
+            report_card.change(-25)
         return report_card()
 
     def _order(self, action) -> bool:
-        self.debug_message(action)
         if self._is_action_valid(action):
+            print(action)
             buy_price, sell_change, stop_change = action
             if self.live:
-                '''
-                @TODO Work on correcting the order information
-                '''
+                # TODO Work on correcting the order information
                 self.instrument.order(buy_price, buy_price + sell_change, buy_price - stop_change)
                 return True
             else:
                 cost = buy_price * 2
                 self._update_account(cost * -1)
-                order = self._create_order(buy_price, buy_price + sell_change, buy_price - stop_change)
+                order = create_order(buy_price, buy_price + sell_change, buy_price - stop_change, self.tzinfo)
                 self.orders.append(order)
                 return True
         return False
 
     def _get_terminal(self) -> tuple[bool, bool]:
-        if self.debug:
-            print(f"Account cash: {self.account.cash}")
-        return self.account.cash == 0, self.current_dt > self.end_dt is not None and self.live == False
+        return self.account.cash == 0, self.current_dt > self.end_dt is not None and not self.live
 
     def _is_action_valid(self, action) -> bool:
         if action[0] > float(self.account.buying_power):
             return False
-        orders = get_open_positions(self.symbol)
+        orders = get_open_positions(self.symbol) if self.live else self._get_orders_by_status(OrderStatus.ACCEPTED)
         if len(orders) > 2:
             return False
-
         return True
 
     def setup(self, symbol: str, interval: int, end_time: datetime = None, start_time: datetime = None,
               live: bool = False, debug: bool = False):
         self.orders = []
+        self.data = {}
         self.instrument = Symbol('TSLA')
         self.live = live
         self.debug = debug
         self.symbol = symbol
         self.interval = interval
         self.account = get_account()
+        self.original_account_state = self.account
         data = self.instrument.collection(start_time, end_time)
         for entry in data[self.symbol]:
             self.data[entry['t']] = entry
         t = list(self.data.keys())[0]
         self.tzinfo = datetime.fromisoformat(t).tzinfo
-        if live == True:
+        if live:
             self.current_dt = datetime.now()
             self.start_dt = self.current_dt - timedelta(hours=interval)
         else:
             self.original_start_dt = start_time.replace(tzinfo=self.tzinfo)
-            self._reset_simulated_timesteps(start_time, end_time, interval)
-        self.debug_message("Setup complete!")
+            self._reset_simulated_time_steps(start_time, end_time, interval)
 
-    def debug_message(self, msg):
-        if self.debug:
-            print(msg)
-
-    def _reset_simulated_timesteps(self, start_time, end_time, interval):
+    def _reset_simulated_time_steps(self, start_time, end_time, interval):
         self.end_dt = end_time.replace(tzinfo=self.tzinfo)
         self.start_dt = start_time.replace(tzinfo=self.tzinfo)
         self.current_dt = self.start_dt + timedelta(hours=interval)
         self.delta_dt = datetime.now(self.tzinfo)
         self._step_times()
 
-    def _get_open_orders(self) -> list[Order | MockOrder]:
-        return [order for order in self.orders if order.status == OrderStatus.ACCEPTED]
-
-    def _get_pending_orders(self) -> list[Order | MockOrder]:
-        return [order for order in self.orders if order.status == OrderStatus.PENDING_NEW]
+    def _get_orders_by_status(self, status: OrderStatus):
+        return [order for order in self.orders if order.status == status]
 
     def _get_timestep_collection(self, start_dt: datetime, end_dt: datetime) -> list:
-        keys = [t for t in self.data.keys() if
-                datetime.fromisoformat(t).replace(tzinfo=self.tzinfo) > start_dt and datetime.fromisoformat(t).replace(
-                    tzinfo=self.tzinfo) < end_dt]
+        keys = [t for t in self.data.keys() if start_dt < self._ts(t) < end_dt]
         return [self.data[key] for key in keys]
 
-    def _create_order(self, open_price, close_price, stop_price) -> MockOrder:
-        return MockOrder(
-            uuid4(),
-            datetime.now(self.tzinfo),
-            open_price,
-            close_price,
-            stop_price,
-            OrderStatus.PENDING_NEW
-        )
-
-    def _close_orders(self):
+    def _order_step(self):
         current = self._get_timestep_collection(self.start_dt, self.current_dt)[-1]
-        open_orders = self._get_open_orders()
-        pending_orders = self._get_pending_orders()
-        closed_orders = [order.id for order in open_orders if order.close_price <= current['c'] or order.close_price <= current['o']]
-        stopped_orders = [order.id for order in open_orders if order.stop_price >= current['c'] or order.close_price >= current['o']]
-        opened_orders = [order.id for order in pending_orders if current['c'] <= order.open_price or current['o'] <= order.open_price]
+        open_orders = self._get_orders_by_status(OrderStatus.ACCEPTED)
+        pending_orders = self._get_orders_by_status(OrderStatus.PENDING_NEW)
+        closed_orders = [order.id for order in open_orders if
+                         order.close_price <= current['c'] or order.close_price <= current['o']]
+        stopped_orders = [order.id for order in open_orders if
+                          order.stop_price >= current['c'] or order.close_price >= current['o']]
+        opened_orders = [order.id for order in pending_orders if
+                         current['c'] <= order.open_price or current['o'] <= order.open_price]
         self._update_orders(opened_orders, status=OrderStatus.ACCEPTED)
         self._update_orders(closed_orders, status=OrderStatus.FILLED)
         self._update_orders(stopped_orders, status=OrderStatus.STOPPED)
@@ -239,6 +197,9 @@ class FinancialEnv(Env):
         self.account.cash = float(self.account.cash) + shared
 
     def _find_by_price(self, price: float):
-        collection = self._get_timestep_collection(self.current_dt, self.end_dt)
-        print(collection)
+        prices = self._get_timestep_collection(self.current_dt, self.end_dt)
+        print(prices)
         exit(1)
+
+    def _ts(self, timestamp: str) -> datetime:
+        return datetime.fromisoformat(timestamp).replace(tzinfo=self.tzinfo)

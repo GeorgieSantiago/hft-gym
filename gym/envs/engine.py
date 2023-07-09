@@ -102,7 +102,7 @@ class Engine(Env):
     @TODO figure out if we can reset the paper account dynamically
     '''
     def _is_terminal(self) -> tuple(bool,bool):
-        return self.account.cash < 0
+        return self.account.cash < 50000
     
     '''
     @TODO figure out if the action is valid based on the difference
